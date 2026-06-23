@@ -12,8 +12,42 @@ Usage (in app.py, before any UI):
 import streamlit as st
 
 
+def _get_query_param(name: str, default: str = "") -> str:
+    try:
+        value = st.query_params.get(name, default)
+        if isinstance(value, list):
+            return value[0] if value else default
+        return value or default
+    except Exception:
+        try:
+            params = st.experimental_get_query_params()
+            values = params.get(name, [default])
+            return values[0] if values else default
+        except Exception:
+            return default
+
+
+def _set_query_param(name: str, value: str) -> None:
+    try:
+        st.query_params[name] = value
+        return
+    except Exception:
+        pass
+
+    try:
+        params = st.experimental_get_query_params()
+        params[name] = value
+        st.experimental_set_query_params(**params)
+    except Exception:
+        return
+
+
 def check_auth() -> None:
-    """If DEMO_PASSWORD is configured in secrets, require it before showing the app."""
+    """If DEMO_PASSWORD is configured in secrets, require it before showing the app.
+
+    Supports URL query param demo_authed=1 so that a page refresh does not
+    re-prompt for the password within the same browser session.
+    """
     try:
         expected = st.secrets["DEMO_PASSWORD"]
     except (KeyError, FileNotFoundError):
@@ -24,7 +58,8 @@ def check_auth() -> None:
         # Empty password – skip auth
         return
 
-    if st.session_state.get("_auth_ok"):
+    if st.session_state.get("demo_authed") or _get_query_param("demo_authed") == "1":
+        st.session_state["demo_authed"] = True
         return
 
     st.markdown(
@@ -42,7 +77,8 @@ def check_auth() -> None:
 
     if st.button("进入", type="primary", use_container_width=True):
         if pwd == expected:
-            st.session_state._auth_ok = True
+            st.session_state["demo_authed"] = True
+            _set_query_param("demo_authed", "1")
             st.rerun()
         else:
             st.error("口令不正确，请重试")
