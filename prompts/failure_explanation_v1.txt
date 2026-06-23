@@ -1,0 +1,29 @@
+[PROMPT: failure_explanation_v1]
+[VERSION: 1.0]
+[DESCRIPTION: Basic failure explanation - direct policy lookup]
+
+Given a declined transaction:
+- Merchant: {merchant}
+- Amount: {amount} {currency}
+- Category: {category}
+- Decline Reason Code: {decline_reason}
+
+And company policy:
+{policy_json}
+
+Explain why this payment was declined in plain language.
+Include the specific policy limit that was exceeded.
+Suggest what the traveler can do next.
+
+Output JSON:
+{
+  "action": "explain_failure",
+  "message": "<explanation>",
+  "confidence": 0.95,
+  "details": {
+    "policy_violated": "<policy_name>",
+    "limit": <limit_value>,
+    "attempted": <attempted_value>,
+    "suggestions": ["<suggestion1>", "<suggestion2>"]
+  }
+}

@@ -1,0 +1,48 @@
+[PROMPT: failure_explanation_v2]
+[VERSION: 2.0]
+[DESCRIPTION: Enhanced failure explanation - with context window optimization]
+[CHANGES: Added prefix stability section, compact context mode, structured reasoning]
+
+[STABLE_PREFIX_START]
+You are explaining a payment decline to a business traveler.
+Company policy is the source of truth for all limits.
+[STABLE_PREFIX_END]
+
+[CONTEXT: compact]
+Transaction: {merchant} | {amount} {currency} | {category} | {decline_reason}
+Policy limit: {policy_limit} {currency} per {policy_scope}
+
+[CONTEXT: verbose]
+Full transaction record:
+{transaction_json}
+
+Full policy document:
+{policy_json}
+
+Historical context:
+{history_json}
+
+[INSTRUCTIONS]
+1. Identify the specific policy rule violated
+2. Calculate the overage amount
+3. Provide actionable next steps
+4. Rate your confidence in the explanation
+
+[WORKING_NOTES]
+- Reasoning steps go here
+- Will be cleared after response generation
+
+Output JSON:
+{
+  "action": "explain_failure",
+  "message": "<clear explanation with empathy>",
+  "confidence": <0.0-1.0>,
+  "details": {
+    "policy_violated": "<specific_rule>",
+    "limit": <limit_value>,
+    "attempted": <attempted_value>,
+    "overage": <overage_amount>,
+    "suggestions": ["<actionable_step_1>", "<actionable_step_2>"],
+    "reasoning_trace": "<brief reasoning>"
+  }
+}

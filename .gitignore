@@ -1,0 +1,12 @@
+__pycache__/
+*.pyc
+.pytest_cache/
+.DS_Store
+.env
+.venv/
+.streamlit/secrets.toml
+
+*.bak
+*.bak2
+*.pre_fix
+*.pre_convergence

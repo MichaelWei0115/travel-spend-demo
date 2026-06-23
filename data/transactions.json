@@ -1,0 +1,36 @@
+[
+  {
+    "id": "txn_001",
+    "event": "payment.auth.success",
+    "merchant": "Tokyo Hotel",
+    "amount": 820.00,
+    "currency": "USD",
+    "category": "hotel",
+    "timestamp": "2024-03-15T14:30:00Z",
+    "status": "approved",
+    "traveler": "Alice Chen"
+  },
+  {
+    "id": "txn_002",
+    "event": "payment.auth.failed",
+    "merchant": "Tokyo Hotel",
+    "amount": 1500.00,
+    "currency": "USD",
+    "category": "hotel",
+    "timestamp": "2024-03-16T09:00:00Z",
+    "status": "declined",
+    "decline_reason": "exceeds_single_transaction_limit",
+    "traveler": "Bob Wang"
+  },
+  {
+    "id": "txn_003",
+    "event": "payment.auth.success",
+    "merchant": "Sushi Restaurant",
+    "amount": 96.00,
+    "currency": "USD",
+    "category": "dining",
+    "timestamp": "2024-03-15T19:45:00Z",
+    "status": "approved",
+    "traveler": "Alice Chen"
+  }
+]
