@@ -19,6 +19,7 @@ from phone_ui import render_phone_shell, consume_phone_action
 from demo_state import init_state, reset_demo
 from demo_actions import handle_demo_action, init_full_state, render_toast, queue_sidebar_action, process_pending_sidebar_action
 from feedback import inject_feedback_styles
+from auth_gate import check_auth
 
 
 # --- Page Config ---
@@ -30,6 +31,9 @@ st.set_page_config(
 )
 
 inject_feedback_styles()
+
+# --- Auth Gate (password protection for Cloud deploy) ---
+check_auth()
 
 # Responsive CSS now handled by phone_shell.py
 

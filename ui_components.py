@@ -11,6 +11,9 @@ Architecture (post-refactor):
 """
 
 import streamlit as st
+from pathlib import Path
+
+BASE_DIR = Path(__file__).resolve().parent
 
 
 # =============================================================================
@@ -223,14 +226,27 @@ def _confidence_color(confidence):
     return "#F44336"
 
 
+def _resolve_asset_path(path):
+    p = Path(path)
+    if p.is_absolute():
+        return p
+    candidate = BASE_DIR / p
+    if candidate.exists():
+        return candidate
+    return p
+
+
 def _load_image_as_data_uri(image_path):
-    import base64, os
-    if not image_path or not os.path.isfile(image_path):
+    import base64
+    if not image_path:
+        return ""
+    resolved = _resolve_asset_path(image_path)
+    if not resolved.exists() or not resolved.is_file():
         return ""
     try:
-        with open(image_path, "rb") as f:
+        with resolved.open("rb") as f:
             data = base64.b64encode(f.read()).decode("ascii")
-        ext = os.path.splitext(image_path)[1].lower().lstrip(".")
+        ext = resolved.suffix.lower().lstrip(".")
         mime = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg"}.get(ext, "image/png")
         return f"data:{mime};base64,{data}"
     except Exception:
