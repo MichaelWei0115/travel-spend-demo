@@ -34,7 +34,7 @@ def init_full_state():
         "record_filter": "all",
         "selected_record_id": None,
         "toast_message": "",
-        "h5_completed_actions": set(),
+        "h5_completed_actions": {},
     }
 
     for k, v in defaults.items():
@@ -48,6 +48,11 @@ def init_full_state():
         st.session_state._last_sidebar_action = None
     if "_ui_nonce" not in st.session_state:
         st.session_state._ui_nonce = 0
+
+    # Compat: migrate old set() to dict
+    actions = st.session_state.get("h5_completed_actions")
+    if isinstance(actions, set):
+        st.session_state.h5_completed_actions = {k: True for k in actions}
 
     # NOTE: We do NOT restore page/rid from query params here.
     # consume_phone_action() handles that correctly after processing phone clicks.
@@ -167,7 +172,7 @@ def _h5_action_key(action: str, record_id: str) -> str:
 def _h5_append_once(action: str, record_id: str, msg: dict):
     key = _h5_action_key(action, record_id)
     if key not in st.session_state.h5_completed_actions:
-        st.session_state.h5_completed_actions.add(key)
+        st.session_state.h5_completed_actions[key] = True
         append_message(msg)
 
 
@@ -406,6 +411,101 @@ def handle_demo_action(action: str, payload: dict = None):
             else:
                 show_info_toast("当前状态无需重新处理")
         st.session_state.current_phone_page = "consume_detail"
+
+    elif action == "go_back":
+        prev = st.session_state.get("previous_phone_page", "chat")
+        st.session_state.current_phone_page = prev
+        st.session_state.selected_record_id = None
+
+    # ---- H5 page bridging actions ----
+    elif action == "go_supplement":
+        rid = payload.get("record_id") if payload else st.session_state.selected_record_id
+        if rid:
+            st.session_state.selected_record_id = rid
+        st.session_state.current_phone_page = "supplement_material"
+
+    elif action == "confirm_single_sync":
+        # Same logic as confirm_submit, but navigates to detail page instead of list
+        rid = payload.get("record_id") if payload else st.session_state.selected_record_id
+        if not rid:
+            rid = ensure_selected_record(STATUS_PENDING_SUBMIT)
+        if rid:
+            st.session_state.selected_record_id = rid
+            rec = get_record(rid)
+            if rec:
+                if rec.get("status") in (STATUS_PENDING_SUBMIT, STATUS_SUBMITTED):
+                    now = datetime.now().strftime("%Y-%m-%d %H:%M")
+                    order_no = f"BX{datetime.now().strftime('%Y%m%d%H%M')}{rid[-3:]}"
+                    update_record(rid, {
+                        "status": STATUS_SUBMITTED,
+                        "sync_time": now,
+                        "sync_order_no": order_no,
+                        "ai_check_message": "AI 校验通过，费用已提交至报销系统。",
+                    })
+                    merchant = rec.get("merchant_name", "")
+                    _h5_append_once("confirm_single_sync", rid, {
+                        "role": "assistant", "type": "text",
+                        "content": f"{merchant} 该笔消费已同步至报销系统。",
+                    })
+                    show_success_toast("已提交报销")
+                else:
+                    show_info_toast("当前状态不可提交")
+        st.session_state.current_phone_page = "reimbursement_detail"
+
+    elif action == "view_record_detail":
+        rid = payload.get("record_id") if payload else st.session_state.selected_record_id
+        if rid:
+            st.session_state.selected_record_id = rid
+        st.session_state.current_phone_page = "reimbursement_detail"
+
+    elif action == "go_back_to_list":
+        st.session_state.current_phone_page = "reimbursement_list"
+
+    elif action == "go_back_to_detail":
+        rid = st.session_state.selected_record_id
+        st.session_state.current_phone_page = "reimbursement_detail"
+
+    elif action == "upload_invoice":
+        filename = payload.get("filename", "invoice.pdf") if payload else "invoice.pdf"
+        if "supplement_form" not in st.session_state:
+            st.session_state.supplement_form = {
+                "invoice_uploaded": False, "invoice_name": "",
+                "receipt_uploaded": False, "receipt_name": "",
+                "note": "", "expense_type": "",
+            }
+        st.session_state.supplement_form["invoice_uploaded"] = True
+        st.session_state.supplement_form["invoice_name"] = filename
+        show_success_toast("发票已上传")
+        st.rerun()
+
+    elif action == "upload_receipt_voucher":
+        filename = payload.get("filename", "receipt.jpg") if payload else "receipt.jpg"
+        if "supplement_form" not in st.session_state:
+            st.session_state.supplement_form = {
+                "invoice_uploaded": False, "invoice_name": "",
+                "receipt_uploaded": False, "receipt_name": "",
+                "note": "", "expense_type": "",
+            }
+        st.session_state.supplement_form["receipt_uploaded"] = True
+        st.session_state.supplement_form["receipt_name"] = filename
+        show_success_toast("消费凭证已上传")
+        st.rerun()
+
+    elif action == "submit_supplement":
+        rid = st.session_state.selected_record_id
+        rec = get_record(rid) if rid else None
+        if rec:
+            update_record(rid, {
+                "status": STATUS_PENDING_SUBMIT,
+                "ai_check_message": "收据已上传，AI 校验通过，可以提交报销。",
+            })
+            merchant = rec.get("merchant_name", "")
+            _h5_append_once("submit_supplement", rid, {
+                "role": "assistant", "type": "text",
+                "content": f"{merchant} 补充材料已提交，校验通过。",
+            })
+            show_success_toast("补充材料已提交")
+        st.session_state.current_phone_page = "reimbursement_detail"
 
     # ---- Sidebar Demo Flow Steps ----
     elif action == "step_push_receipt":

@@ -1,3 +1,5 @@
+> **Deprecated Notice**: 本文档描述的是旧 5 状态 / 双状态模型，可能与当前代码不一致。当前实现以 `CURRENT_STATE.md` 和 `reimbursement_data.py` 为准。
+
 # DingTalk Auto Reimbursement Interactive H5 v2
 
 ## Final Delivery Document

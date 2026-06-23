@@ -45,7 +45,7 @@ def reset_demo():
     st.session_state.selected_record_id = None
     # Clear H5->chat linkage tracking so actions can re-fire after reset
     if "h5_completed_actions" in st.session_state:
-        st.session_state.h5_completed_actions = set()
+        st.session_state.h5_completed_actions = {}
 
 
 # =============================================================================

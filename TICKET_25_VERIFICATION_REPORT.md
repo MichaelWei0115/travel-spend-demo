@@ -1,3 +1,5 @@
+> **Deprecated Notice**: 本文档描述的是旧 5 状态 / 双状态模型，可能与当前代码不一致。当前实现以 `CURRENT_STATE.md` 和 `reimbursement_data.py` 为准。
+
 # Ticket 25 Verification Report
 
 Date: 2026-06-18

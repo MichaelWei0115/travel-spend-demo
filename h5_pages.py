@@ -14,8 +14,10 @@ Pages:
 import streamlit as st
 from demo_actions import get_record, get_filtered_records, handle_demo_action
 from reimbursement_data import (
-    get_ai_check_label, get_sync_status_label, format_amount, format_sync_time,
-    get_ai_check_color, get_sync_status_color,
+    get_status_label, get_status_color, get_pill_class,
+    derive_ai_check_result, derive_sync_status,
+    format_amount, format_sync_time,
+    STATUS_PENDING_RECEIPT, STATUS_PENDING_SUBMIT, STATUS_SUBMITTED, STATUS_ERROR,
 )
 from feedback import show_success_toast, show_error_toast, show_info_toast
 
@@ -46,7 +48,7 @@ def _render_h5_header(title, back_action="go_back", show_right_icon=False):
 
 
 # =============================================================================
-# Reimbursement List Page (工单4: DingTalk mobile list)
+# Reimbursement List Page
 # =============================================================================
 
 def render_reimbursement_list_page():
@@ -57,19 +59,19 @@ def render_reimbursement_list_page():
     all_records = st.session_state.reimbursement_records
     counts = {
         "all": len(all_records),
-        "need_supplement": len([r for r in all_records if r["ai_check_result"] == "need_supplement"]),
-        "passed": len([r for r in all_records if r["ai_check_result"] == "passed" and r["sync_status"] in ("not_synced", "syncing")]),
-        "synced": len([r for r in all_records if r["sync_status"] == "synced"]),
-        "sync_failed": len([r for r in all_records if r["sync_status"] == "sync_failed"]),
+        "pending_receipt": len([r for r in all_records if r.get("status") == STATUS_PENDING_RECEIPT]),
+        "pending_submit": len([r for r in all_records if r.get("status") == STATUS_PENDING_SUBMIT]),
+        "submitted": len([r for r in all_records if r.get("status") == STATUS_SUBMITTED]),
+        "error": len([r for r in all_records if r.get("status") == STATUS_ERROR]),
     }
     current_filter = st.session_state.get("record_filter", "all")
 
     filter_options = [
         ("all", f"\u5168\u90e8 {counts['all']}"),
-        ("need_supplement", f"\u5f85\u8865\u5145 {counts['need_supplement']}"),
-        ("passed", f"\u6821\u9a8c\u901a\u8fc7 {counts['passed']}"),
-        ("synced", f"\u5df2\u540c\u6b65 {counts['synced']}"),
-        ("sync_failed", f"\u540c\u6b65\u5931\u8d25 {counts['sync_failed']}"),
+        ("pending_receipt", f"\u5f85\u8865\u7968 {counts['pending_receipt']}"),
+        ("pending_submit", f"\u5f85\u63d0\u4ea4 {counts['pending_submit']}"),
+        ("submitted", f"\u5df2\u63d0\u4ea4 {counts['submitted']}"),
+        ("error", f"\u5f02\u5e38 {counts['error']}"),
     ]
 
     # Filter tabs - horizontal chip bar (DingTalk style)
@@ -91,13 +93,13 @@ def render_reimbursement_list_page():
                 st.session_state.record_filter = key
                 st.rerun()
 
-    # --- Banner for need_supplement ---
-    if current_filter == "need_supplement" and counts["need_supplement"] > 0:
+    # --- Banner for pending_receipt ---
+    if current_filter == "pending_receipt" and counts["pending_receipt"] > 0:
         st.html('''
         <div style="margin:8px 12px; padding:10px 14px; background:#FFF7E6; border:1px solid #FFE0B2;
                     border-radius:8px; font-size:13px; color:#E65100;">
             <span style="margin-right:6px;">&#9888;</span>
-            \u8bf7\u5c3d\u5feb\u8865\u5145\u6750\u6599\uff0c\u4ee5\u514d\u5f71\u54cd\u62a5\u9500\u8fdb\u5ea6\u3002
+            \u8bf7\u5c3d\u5feb\u4e0a\u4f20\u7968\u636e\uff0c\u4ee5\u514d\u5f71\u54cd\u62a5\u9500\u8fdb\u5ea6\u3002
         </div>
         ''')
 
@@ -106,335 +108,260 @@ def render_reimbursement_list_page():
 
     if not records:
         st.html('''
-        <div style="text-align:center; padding:80px 24px; color:#86909C;">
-            <div style="font-size:48px; margin-bottom:16px; opacity:0.4;">&#128237;</div>
-            <div style="font-size:14px;">\u6682\u65e0\u7b26\u5408\u6761\u4ef6\u7684\u8bb0\u5f55</div>
+        <div style="text-align:center; padding:40px 20px; color:#86909C;">
+            <div style="font-size:32px; margin-bottom:8px;">&#128203;</div>
+            <div style="font-size:14px;">\u6682\u65e0\u8bb0\u5f55</div>
         </div>
         ''')
         return
 
     for rec in records:
-        _render_record_card(rec)
+        _render_list_card(rec)
 
 
-def _render_record_card(rec):
-    """Render a single reimbursement record card - DingTalk compact style."""
-    rid = rec["id"]
-    ai_label = get_ai_check_label(rec["ai_check_result"])
-    ai_color = get_ai_check_color(rec["ai_check_result"])
-    sync_label = get_sync_status_label(rec["sync_status"])
-    sync_color = get_sync_status_color(rec["sync_status"])
-    amount_str = format_amount(rec["amount"], rec["currency"])
-    sync_time_str = format_sync_time(rec["sync_time"])
-    ai_msg = rec.get("ai_check_message", "")
+def _render_list_card(rec):
+    """Render a single record card in the list view."""
+    status = rec.get("status", "")
+    status_label = get_status_label(status)
+    status_color = get_status_color(status)
+    pill_class = get_pill_class(status)
 
-    # Card HTML (visual) - compact mobile card
-    card_html = f'''
-    <div style="
-        background:#fff; border-radius:12px; margin:8px 12px; padding:14px 16px;
-        box-shadow:0 1px 4px rgba(0,0,0,0.06); border:1px solid #f2f3f5;
-    ">
-        <!-- Header: merchant + amount -->
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
-            <div>
-                <div style="font-size:15px; font-weight:600; color:#1D2129;">{rec["merchant_name"]}</div>
-                <div style="font-size:12px; color:#86909C; margin-top:2px;">{rec["transaction_time"]}</div>
-            </div>
-            <div style="font-size:16px; font-weight:600; color:#1D2129;">{amount_str}</div>
+    # Card HTML (DingTalk compact style)
+    st.html(f'''
+    <div style="background:#fff; border-radius:12px; margin:8px 12px; padding:14px 16px;
+                box-shadow:0 1px 4px rgba(0,0,0,0.04); position:relative;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+            <span style="font-size:15px; font-weight:600; color:#1D2129;">{rec["merchant_name"]}</span>
+            <span style="font-size:12px; padding:2px 8px; border-radius:10px;
+                         background:{status_color}15; color:{status_color}; font-weight:500;">
+                {status_label}
+            </span>
         </div>
-        <!-- Status rows -->
-        <div style="font-size:12px; margin-top:8px;">
-            <div style="display:flex; justify-content:space-between; padding:3px 0;">
-                <span style="color:#86909C;">AI\u6821\u9a8c</span>
-                <span style="color:{ai_color}; font-weight:500; padding:1px 8px; border-radius:4px;
-                       background:{ai_color}15;">{ai_label}</span>
-            </div>
-            <div style="display:flex; justify-content:space-between; padding:3px 0;">
-                <span style="color:#86909C;">\u540c\u6b65\u72b6\u6001</span>
-                <span style="color:{sync_color}; font-weight:500; padding:1px 8px; border-radius:4px;
-                       background:{sync_color}15;">{sync_label}</span>
-            </div>
-            <div style="display:flex; justify-content:space-between; padding:3px 0;">
-                <span style="color:#86909C;">\u6700\u65b0\u540c\u6b65</span>
-                <span style="color:#4E5969;">{sync_time_str}</span>
-            </div>
-            <div style="display:flex; justify-content:space-between; padding:3px 0;">
-                <span style="color:#86909C;">\u6821\u9a8c\u8bf4\u660e</span>
-                <span style="color:#4E5969; max-width:180px; text-align:right;">{ai_msg}</span>
-            </div>
+        <div style="display:flex; justify-content:space-between; align-items:baseline;">
+            <span style="font-size:13px; color:#4E5969;">{rec["expense_type"]} | {rec.get("transaction_time", "--")}</span>
+            <span style="font-size:16px; font-weight:700; color:#1D2129;">{format_amount(rec["amount"], rec["currency"])}</span>
         </div>
     </div>
-    '''
-    st.html(card_html)
+    ''')
 
-    # Action buttons (Streamlit native - functional)
-    if rec["ai_check_result"] == "need_supplement":
-        bc1, bc2 = st.columns(2)
-        with bc1:
-            if st.button("\u67e5\u770b\u8be6\u60c5", key=f"detail_{rid}", use_container_width=True):
-                handle_demo_action("open_record_detail", {"record_id": rid})
-                st.rerun()
-        with bc2:
-            if st.button("\u53bb\u8865\u5145", key=f"supplement_{rid}", type="primary", use_container_width=True):
-                handle_demo_action("open_supplement_page", {"record_id": rid})
-                st.rerun()
-    elif rec["ai_check_result"] == "passed" and rec["sync_status"] in ("not_synced", "syncing"):
-        bc1, bc2 = st.columns(2)
-        with bc1:
-            if st.button("\u67e5\u770b\u8be6\u60c5", key=f"detail_{rid}", use_container_width=True):
-                handle_demo_action("open_record_detail", {"record_id": rid})
-                st.rerun()
-        with bc2:
-            if st.button("\u786e\u8ba4\u5e76\u540c\u6b65", key=f"sync_{rid}", type="primary", use_container_width=True):
-                handle_demo_action("confirm_single_sync", {"record_id": rid})
-                st.rerun()
-    elif rec["sync_status"] == "sync_failed":
-        bc1, bc2 = st.columns(2)
-        with bc1:
-            if st.button("\u67e5\u770b\u8be6\u60c5", key=f"detail_{rid}", use_container_width=True):
-                handle_demo_action("open_record_detail", {"record_id": rid})
-                st.rerun()
-        with bc2:
-            if st.button("\u91cd\u65b0\u540c\u6b65", key=f"retry_{rid}", type="primary", use_container_width=True):
-                handle_demo_action("retry_sync", {"record_id": rid})
-                st.rerun()
-    else:
-        if st.button("\u67e5\u770b\u8be6\u60c5", key=f"detail_{rid}", use_container_width=True):
-            handle_demo_action("open_record_detail", {"record_id": rid})
-            st.rerun()
+    # CTA button row
+    cta = _get_cta_for_record(rec)
+    col1, col2 = st.columns([3, 2])
+    with col1:
+        if st.button(f"\u67e5\u770b\u8be6\u60c5", key=f"list_detail_{rec['id']}", use_container_width=True):
+            st.session_state.selected_record_id = rec["id"]
+            handle_demo_action("view_record_detail", {"record_id": rec["id"]})
+    with col2:
+        if cta:
+            if st.button(cta["label"], key=f"list_cta_{rec['id']}", type="primary", use_container_width=True):
+                handle_demo_action(cta["action"], {"record_id": rec["id"]})
+
+
+def _get_cta_for_record(rec):
+    """Return CTA config based on record status."""
+    status = rec.get("status", "")
+    if status == STATUS_PENDING_RECEIPT:
+        return {"label": "\u4e0a\u4f20\u7968\u636e", "action": "go_supplement"}
+    elif status == STATUS_PENDING_SUBMIT:
+        return {"label": "\u63d0\u4ea4\u62a5\u9500", "action": "confirm_single_sync"}
+    elif status == STATUS_ERROR:
+        return {"label": "\u91cd\u65b0\u5904\u7406", "action": "retry_process"}
+    return None
 
 
 # =============================================================================
-# Detail Page (工单5: DingTalk mobile detail)
+# Reimbursement Detail Page
 # =============================================================================
 
 def render_reimbursement_detail_page():
-    """Render the reimbursement detail/verification page - DingTalk mobile style."""
-    _render_h5_header("\u6821\u9a8c\u8be6\u60c5", "go_back")
+    """Render the detail page for a single reimbursement record."""
+    _render_h5_header("\u6821\u9a8c\u8be6\u60c5", "go_back_to_list")
 
     rid = st.session_state.get("selected_record_id")
     rec = get_record(rid) if rid else None
+
     if not rec:
-        st.error("\u8bb0\u5f55\u4e0d\u5b58\u5728")
+        st.html('''
+        <div style="text-align:center; padding:40px 20px; color:#86909C;">
+            <div style="font-size:14px;">\u8bb0\u5f55\u4e0d\u5b58\u5728</div>
+        </div>
+        ''')
         return
 
-    ai_label = get_ai_check_label(rec["ai_check_result"])
-    ai_color = get_ai_check_color(rec["ai_check_result"])
-    sync_label = get_sync_status_label(rec["sync_status"])
-    sync_color = get_sync_status_color(rec["sync_status"])
-    amount_str = format_amount(rec["amount"], rec["currency"])
-    sync_time_str = format_sync_time(rec["sync_time"])
-    sync_order = rec.get("sync_order_no") or "--"
-    ai_status = rec["ai_check_result"]
-    sync_status = rec["sync_status"]
+    status = rec.get("status", "")
+    status_label = get_status_label(status)
+    status_color = get_status_color(status)
+    ai_check = derive_ai_check_result(status)
+    sync_st = derive_sync_status(status)
 
-    # --- Core Info Card ---
+    # --- Status header ---
     st.html(f'''
-    <div style="background:#fff; border-radius:12px; margin:8px 12px; padding:16px; box-shadow:0 1px 4px rgba(0,0,0,0.04);">
-        <div style="font-size:14px; font-weight:600; color:#1D2129; margin-bottom:12px;">\u6838\u5fc3\u4fe1\u606f</div>
-        <div style="font-size:13px;">
-            <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #f2f3f5;">
-                <span style="color:#86909C;">AI\u6821\u9a8c</span>
-                <span style="color:{ai_color}; font-weight:600; padding:2px 10px; border-radius:4px;
-                       background:{ai_color}15;">{ai_label}</span>
-            </div>
-            <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #f2f3f5;">
-                <span style="color:#86909C;">\u540c\u6b65\u72b6\u6001</span>
-                <span style="color:{sync_color}; font-weight:600; padding:2px 10px; border-radius:4px;
-                       background:{sync_color}15;">{sync_label}</span>
-            </div>
-            <div style="display:flex; justify-content:space-between; padding:8px 0;">
-                <span style="color:#86909C;">\u6700\u65b0\u540c\u6b65\u65f6\u95f4</span>
-                <span style="color:#1D2129;">{sync_time_str}</span>
-            </div>
-        </div>
-    </div>
-    ''')
-
-    # --- Expense Info Card ---
-    info_rows = [
-        ("\u8d39\u7528\u7c7b\u578b", rec["expense_type"]),
-        ("\u540c\u6b65\u5355\u53f7", sync_order),
-        ("\u5173\u8054\u6d88\u8d39", rec["merchant_name"]),
-        ("\u91d1\u989d", f'<span style="font-size:16px;font-weight:600;color:#1D2129;">{amount_str}</span>'),
-        ("\u65f6\u95f4", rec["transaction_time"]),
-    ]
-    rows_html = ""
-    for label, value in info_rows:
-        rows_html += f'''
-        <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid #f2f3f5; font-size:13px;">
-            <span style="color:#86909C;">{label}</span>
-            <span style="color:#1D2129;">{value}</span>
-        </div>
-        '''
-
-    st.html(f'''
-    <div style="background:#fff; border-radius:12px; margin:8px 12px; padding:16px; box-shadow:0 1px 4px rgba(0,0,0,0.04);">
-        <div style="font-size:14px; font-weight:600; color:#1D2129; margin-bottom:12px;">\u6d88\u8d39\u4fe1\u606f</div>
-        {rows_html}
-    </div>
-    ''')
-
-    # --- AI Explanation Card (color-coded) ---
-    if sync_status == "synced":
-        explanation = "\u8be5\u6d88\u8d39\u7b26\u5408\u4f01\u4e1a\u5dee\u65c5\u4f4f\u5bbf\u89c4\u5219\uff0c\u5df2\u901a\u8fc7 AI \u6821\u9a8c\u5e76\u6210\u529f\u540c\u6b65\u3002"
-        bg = "#E8F5E9"; border_color = "#4CAF50"; icon = "\u2705"; text_color = "#2E7D32"
-    elif ai_status == "passed" and sync_status in ("not_synced", "syncing"):
-        explanation = "\u8be5\u6d88\u8d39\u5df2\u901a\u8fc7 AI \u6821\u9a8c\uff0c\u53ef\u540c\u6b65\u81f3\u62a5\u9500\u7cfb\u7edf\u3002"
-        bg = "#E3F2FD"; border_color = "#1565C0"; icon = "\u2705"; text_color = "#1565C0"
-    elif ai_status == "need_supplement":
-        explanation = rec.get("ai_check_message") or "\u8be5\u6d88\u8d39\u7f3a\u5c11\u53d1\u7968\uff0c\u8bf7\u4e0a\u4f20\u53d1\u7968\u6216\u6d88\u8d39\u51ed\u8bc1\u540e\u91cd\u65b0\u63d0\u4ea4\u6821\u9a8c\u3002"
-        bg = "#FFF3E0"; border_color = "#FF9800"; icon = "\u26a0\ufe0f"; text_color = "#E65100"
-    elif sync_status == "sync_failed":
-        explanation = "\u8be5\u6d88\u8d39\u5df2\u901a\u8fc7 AI \u6821\u9a8c\uff0c\u4f46\u540c\u6b65\u81f3\u62a5\u9500\u7cfb\u7edf\u5931\u8d25\uff0c\u8bf7\u7a0d\u540e\u91cd\u65b0\u540c\u6b65\u3002"
-        bg = "#FFEBEE"; border_color = "#F44336"; icon = "\u274c"; text_color = "#C62828"
-    elif ai_status == "failed":
-        explanation = rec.get("ai_check_message") or "\u8be5\u6d88\u8d39\u4e0d\u7b26\u5408\u5f53\u524d\u4f01\u4e1a\u62a5\u9500\u89c4\u5219\u3002"
-        bg = "#FFEBEE"; border_color = "#F44336"; icon = "\u274c"; text_color = "#C62828"
-    else:
-        explanation = rec.get("ai_check_message") or "\u6821\u9a8c\u4fe1\u606f\u6682\u65e0\u3002"
-        bg = "#F5F5F5"; border_color = "#999"; icon = "\u2139\ufe0f"; text_color = "#666"
-
-    st.html(f'''
-    <div style="background:#fff; border-radius:12px; margin:8px 12px; padding:16px; box-shadow:0 1px 4px rgba(0,0,0,0.04);">
-        <div style="font-size:14px; font-weight:600; color:#1D2129; margin-bottom:12px;">AI \u6821\u9a8c\u8bf4\u660e</div>
-        <div style="background:{bg}; border-left:3px solid {border_color}; border-radius:8px; padding:12px 14px;">
-            <div style="font-size:13px; color:{text_color}; line-height:1.6;">
-                {icon} {explanation}
-            </div>
-        </div>
-    </div>
-    ''')
-
-    # --- Attachments Card ---
-    attachments = rec.get("attachments", [])
-    att_items = ""
-    if attachments:
-        for att in attachments:
-            # Determine icon by type
-            if "\u53d1\u7968" in att or "invoice" in att.lower():
-                ficon = "\U0001f4c4"; ftype = "PDF"; fsize = "768 KB"
-            elif "\u51ed\u8bc1" in att or "receipt" in att.lower():
-                ficon = "\U0001f5bc"; ftype = "JPG"; fsize = "1.2 MB"
-            else:
-                ficon = "\U0001f4ce"; ftype = "FILE"; fsize = "--"
-            att_items += f'''
-            <div style="display:flex; align-items:center; justify-content:space-between; padding:10px 0;
-                        border-bottom:1px solid #f2f3f5;">
-                <div style="display:flex; align-items:center; gap:10px;">
-                    <span style="font-size:20px;">{ficon}</span>
-                    <div>
-                        <div style="font-size:13px; color:#1D2129; font-weight:500;">{att}</div>
-                        <div style="font-size:11px; color:#86909C;">{ftype} \u00b7 {fsize}</div>
-                    </div>
+    <div style="background: linear-gradient(135deg, {status_color}15 0%, {status_color}08 100%);
+                border-radius:12px; margin:8px 12px; padding:16px;
+                border-left:4px solid {status_color};">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+                <div style="font-size:17px; font-weight:700; color:#1D2129; margin-bottom:4px;">
+                    {rec["merchant_name"]}
                 </div>
-                <span style="color:#C9CDD4; font-size:16px;">\u203a</span>
+                <div style="font-size:13px; color:#4E5969;">
+                    {rec["expense_type"]} | {rec.get("transaction_time", "--")}
+                </div>
             </div>
-            '''
-    else:
-        att_items = '<div style="font-size:13px; color:#86909C; padding:8px 0;">\u6682\u65e0\u9644\u4ef6</div>'
-
-    st.html(f'''
-    <div style="background:#fff; border-radius:12px; margin:8px 12px; padding:16px; box-shadow:0 1px 4px rgba(0,0,0,0.04);">
-        <div style="font-size:14px; font-weight:600; color:#1D2129; margin-bottom:8px;">\u9644\u4ef6</div>
-        {att_items}
+            <div style="text-align:right;">
+                <div style="font-size:20px; font-weight:700; color:#1D2129;">
+                    {format_amount(rec["amount"], rec["currency"])}
+                </div>
+                <div style="font-size:12px; padding:2px 8px; border-radius:10px;
+                             background:{status_color}15; color:{status_color}; font-weight:500; margin-top:4px;">
+                    {status_label}
+                </div>
+            </div>
+        </div>
     </div>
     ''')
 
-    # --- Bottom Action Buttons (Streamlit native - functional) ---
-    st.markdown("---")
-    if sync_status == "synced":
-        if st.button("\u8fd4\u56de\u5217\u8868", key="detail_back_list", use_container_width=True):
-            handle_demo_action("go_back")
-            st.rerun()
-    elif ai_status == "need_supplement":
-        bc1, bc2 = st.columns(2)
-        with bc1:
-            if st.button("\u8fd4\u56de\u5217\u8868", key="detail_back_list", use_container_width=True):
-                handle_demo_action("go_back")
-                st.rerun()
-        with bc2:
-            if st.button("\u53bb\u8865\u5145", key="detail_go_supplement", type="primary", use_container_width=True):
-                handle_demo_action("open_supplement_page", {"record_id": rid})
-                st.rerun()
-    elif sync_status == "sync_failed":
-        bc1, bc2 = st.columns(2)
-        with bc1:
-            if st.button("\u8fd4\u56de\u5217\u8868", key="detail_back_list", use_container_width=True):
-                handle_demo_action("go_back")
-                st.rerun()
-        with bc2:
-            if st.button("\u91cd\u65b0\u540c\u6b65", key="detail_retry_sync", type="primary", use_container_width=True):
-                handle_demo_action("retry_sync", {"record_id": rid})
-                st.rerun()
-    elif ai_status == "passed" and sync_status in ("not_synced", "syncing"):
-        bc1, bc2 = st.columns(2)
-        with bc1:
-            if st.button("\u8fd4\u56de\u5217\u8868", key="detail_back_list", use_container_width=True):
-                handle_demo_action("go_back")
-                st.rerun()
-        with bc2:
-            if st.button("\u786e\u8ba4\u5e76\u540c\u6b65", key="detail_confirm_sync", type="primary", use_container_width=True):
-                handle_demo_action("confirm_single_sync", {"record_id": rid})
-                st.rerun()
-    elif ai_status == "failed":
-        bc1, bc2 = st.columns(2)
-        with bc1:
-            if st.button("\u8fd4\u56de\u5217\u8868", key="detail_back_list", use_container_width=True):
-                handle_demo_action("go_back")
-                st.rerun()
-        with bc2:
-            if st.button("\u67e5\u770b\u5dee\u65c5\u89c4\u5219", key="detail_travel_rule", use_container_width=True):
-                st.session_state.active_modal = "travel_rules"
-                st.rerun()
-    else:
-        if st.button("\u8fd4\u56de\u5217\u8868", key="detail_back_list", use_container_width=True):
-            handle_demo_action("go_back")
-            st.rerun()
+    # --- AI Check Result Section ---
+    ai_check_label = {"pending": "\u5f85\u6821\u9a8c", "passed": "\u5df2\u901a\u8fc7", "need_supplement": "\u5f85\u8865\u5145", "failed": "\u672a\u901a\u8fc7"}.get(ai_check, ai_check)
+    ai_check_color_map = {"pending": "#999", "passed": "#2E7D32", "need_supplement": "#E65100", "failed": "#C62828"}
+    ai_color = ai_check_color_map.get(ai_check, "#999")
 
+    sync_label_map = {"not_synced": "\u672a\u540c\u6b65", "syncing": "\u540c\u6b65\u4e2d", "synced": "\u5df2\u540c\u6b65", "sync_failed": "\u540c\u6b65\u5931\u8d25"}
+    sync_color_map = {"not_synced": "#999", "syncing": "#1565C0", "synced": "#2E7D32", "sync_failed": "#C62828"}
+    sync_lbl = sync_label_map.get(sync_st, sync_st)
+    sync_clr = sync_color_map.get(sync_st, "#999")
 
-# =============================================================================
-# Supplement Material Page (工单6: DingTalk mobile form)
-# =============================================================================
-
-def render_supplement_material_page():
-    """Render the supplement material page - DingTalk mobile form style."""
-    _render_h5_header("\u8865\u5145\u6750\u6599", "go_back")
-
-    rid = st.session_state.get("selected_record_id")
-    rec = get_record(rid) if rid else None
-    if not rec:
-        st.error("\u8bb0\u5f55\u4e0d\u5b58\u5728")
-        return
-
-    amount_str = format_amount(rec["amount"], rec["currency"])
-    ai_msg = rec.get("ai_check_message") or "\u7f3a\u5c11\u53d1\u7968"
-
-    # --- Record summary card ---
     st.html(f'''
     <div style="background:#fff; border-radius:12px; margin:8px 12px; padding:14px 16px;
                 box-shadow:0 1px 4px rgba(0,0,0,0.04);">
-        <div style="display:flex; justify-content:space-between; align-items:flex-start;">
-            <div>
-                <div style="font-size:15px; font-weight:600; color:#1D2129;">{rec["merchant_name"]}</div>
-                <div style="font-size:12px; color:#86909C; margin-top:2px;">{rec["transaction_time"]}</div>
-                <div style="font-size:12px; color:#86909C; margin-top:2px;">\u8d39\u7528\u7c7b\u578b: {rec["expense_type"]}</div>
+        <div style="font-size:14px; font-weight:600; color:#1D2129; margin-bottom:12px;">AI \u6821\u9a8c\u7ed3\u679c</div>
+        <div style="display:flex; gap:12px; margin-bottom:12px;">
+            <div style="flex:1; padding:10px 12px; background:{ai_color}10; border-radius:8px; text-align:center;">
+                <div style="font-size:12px; color:#86909C; margin-bottom:4px;">\u6821\u9a8c\u72b6\u6001</div>
+                <div style="font-size:14px; font-weight:600; color:{ai_color};">{ai_check_label}</div>
             </div>
-            <div style="font-size:16px; font-weight:600; color:#1D2129;">{amount_str}</div>
+            <div style="flex:1; padding:10px 12px; background:{sync_clr}10; border-radius:8px; text-align:center;">
+                <div style="font-size:12px; color:#86909C; margin-bottom:4px;">\u540c\u6b65\u72b6\u6001</div>
+                <div style="font-size:14px; font-weight:600; color:{sync_clr};">{sync_lbl}</div>
+            </div>
+        </div>
+        <div style="font-size:13px; color:#4E5969; line-height:1.6;">
+            {rec.get("ai_check_message", "")}
         </div>
     </div>
     ''')
 
-    # --- AI check result banner ---
+    # --- Detail Info Cards ---
+    _render_detail_info_section(rec)
+
+    # --- Bottom Actions ---
+    _render_detail_actions(rec)
+
+
+def _render_detail_info_section(rec):
+    """Render the detail information section."""
+    sync_time_str = format_sync_time(rec.get("sync_time"))
+    order_no = rec.get("sync_order_no", "")
+    expense_desc = rec.get("expense_description", "")
+    tax_rate = rec.get("tax_rate", "")
+    note = rec.get("note", "")
+    attachments = rec.get("attachments", [])
+
+    # Basic info
     st.html(f'''
-    <div style="margin:6px 12px; padding:10px 14px; background:#FFF7E6; border:1px solid #FFE0B2;
-                border-radius:8px; font-size:13px; color:#E65100; display:flex; align-items:center; gap:6px;">
-        <span style="font-size:16px;">\u26a0\ufe0f</span>
-        <span>AI\u6821\u9a8c\u7ed3\u679c\uff1a{ai_msg}</span>
+    <div style="background:#fff; border-radius:12px; margin:8px 12px; padding:14px 16px;
+                box-shadow:0 1px 4px rgba(0,0,0,0.04);">
+        <div style="font-size:14px; font-weight:600; color:#1D2129; margin-bottom:10px;">\u57fa\u672c\u4fe1\u606f</div>
+        <div style="font-size:13px; color:#4E5969; line-height:2;">
+            <div>\u8d39\u7528\u8bf4\u660e\uff1a{expense_desc}</div>
+            <div>\u7a0e\u7387\uff1a{tax_rate}</div>
+            <div>\u5907\u6ce8\uff1a{note}</div>
+            <div>\u540c\u6b65\u65f6\u95f4\uff1a{sync_time_str}</div>
+            <div>\u62a5\u9500\u5355\u53f7\uff1a{order_no or "--"}</div>
+        </div>
     </div>
     ''')
 
-    form = st.session_state.supplement_form
+    # Attachments
+    if attachments:
+        attach_html = '<div style="background:#fff; border-radius:12px; margin:8px 12px; padding:14px 16px; box-shadow:0 1px 4px rgba(0,0,0,0.04);"><div style="font-size:14px; font-weight:600; color:#1D2129; margin-bottom:10px;">\u9644\u4ef6</div>'
+        for att in attachments:
+            attach_html += f'''<div style="display:flex;align-items:center;gap:8px;padding:6px 0;">
+                <span style="font-size:16px;">&#128206;</span>
+                <span style="font-size:13px;color:#4E5969;">{att}</span>
+            </div>'''
+        attach_html += '</div>'
+        st.html(attach_html)
+
+
+def _render_detail_actions(rec):
+    """Render bottom action buttons based on record status."""
+    status = rec.get("status", "")
+
+    if status == STATUS_SUBMITTED:
+        st.html('''
+        <div style="background:#E8F5E9; border-radius:12px; margin:8px 12px; padding:16px; text-align:center;">
+            <div style="font-size:16px; font-weight:600; color:#2E7D32;">&#10003; \u5df2\u63d0\u4ea4\u62a5\u9500\u7cfb\u7edf</div>
+            <div style="font-size:12px; color:#4E5969; margin-top:4px;">\u8bf7\u5728\u62a5\u9500\u7cfb\u7edf\u4e2d\u67e5\u770b\u5ba1\u6279\u8fdb\u5ea6</div>
+        </div>
+        ''')
+
+    elif status == STATUS_PENDING_RECEIPT:
+        if st.button("\U0001f4e4 \u4e0a\u4f20\u7968\u636e", key="detail_upload_receipt", type="primary", use_container_width=True):
+            st.session_state.selected_record_id = rec["id"]
+            handle_demo_action("go_supplement", {"record_id": rec["id"]})
+
+    elif status == STATUS_PENDING_SUBMIT:
+        if st.button("\u2705 \u786e\u8ba4\u63d0\u4ea4\u62a5\u9500", key="detail_confirm_sync", type="primary", use_container_width=True):
+            handle_demo_action("confirm_single_sync", {"record_id": rec["id"]})
+
+    elif status == STATUS_ERROR:
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("\U0001f504 \u91cd\u65b0\u5904\u7406", key="detail_retry", type="primary", use_container_width=True):
+                handle_demo_action("retry_process", {"record_id": rec["id"]})
+        with col2:
+            if st.button("\U0001f4dd \u67e5\u770b\u5f02\u5e38\u539f\u56e0", key="detail_view_error", use_container_width=True):
+                st.info(rec.get("ai_check_message", "\u65e0\u5f02\u5e38\u8bf4\u660e"))
+
+
+# =============================================================================
+# Supplement Material Page
+# =============================================================================
+
+def render_supplement_material_page():
+    """Render the supplement material upload form page."""
+    _render_h5_header("\u8865\u5145\u6750\u6599", "go_back_to_detail")
+
+    rid = st.session_state.get("selected_record_id")
+    rec = get_record(rid) if rid else None
+
+    if not rec:
+        st.warning("\u672a\u9009\u62e9\u8bb0\u5f55")
+        return
+
+    # --- Record summary ---
+    st.html(f'''
+    <div style="background:#fff; border-radius:12px; margin:8px 12px; padding:14px 16px;
+                box-shadow:0 1px 4px rgba(0,0,0,0.04);">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+            <div>
+                <div style="font-size:15px; font-weight:600; color:#1D2129;">{rec["merchant_name"]}</div>
+                <div style="font-size:13px; color:#4E5969; margin-top:2px;">{rec["expense_type"]}</div>
+            </div>
+            <div style="font-size:18px; font-weight:700; color:#1D2129;">
+                {format_amount(rec["amount"], rec["currency"])}
+            </div>
+        </div>
+    </div>
+    ''')
+
+    # --- Supplement Form ---
+    form = st.session_state.get("supplement_form", {
+        "invoice_uploaded": False, "invoice_name": "",
+        "receipt_uploaded": False, "receipt_name": "",
+        "note": "", "expense_type": "",
+    })
 
     # --- Upload Invoice ---
     if form.get("invoice_uploaded"):
@@ -455,7 +382,7 @@ def render_supplement_material_page():
             <div style="font-size:14px; font-weight:600; color:#1D2129; margin-bottom:10px;">\u4e0a\u4f20\u53d1\u7968</div>
             <div style="border:2px dashed #C9CDD4; border-radius:12px; padding:24px 16px; text-align:center;">
                 <div style="font-size:28px; color:#86909C; margin-bottom:6px;">&#128196;</div>
-                <div style="font-size:13px; color:#4E5969; font-weight:500;">\u4e0a\u4f20\u53d1\u7968\u6216\u6d88\u8d39\u51ed\u8bc1</div>
+                <div style="font-size:13px; color:#4E5969; font-weight:500;">\u4e0a\u4f20\u53d1\u7968\u6216\u7535\u5b50\u53d1\u7968</div>
                 <div style="font-size:11px; color:#86909C; margin-top:4px;">\u652f\u6301\u56fe\u7247 / PDF\uff0c\u5355\u4e2a\u6587\u4ef6\u4e0d\u8d85\u8fc7 10MB</div>
             </div>
         </div>
