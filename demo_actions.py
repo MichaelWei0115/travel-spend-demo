@@ -6,6 +6,7 @@ All buttons route through handle_demo_action(action, payload).
 """
 
 import streamlit as st
+from query_params import set_query_params_preserving_auth
 import time
 from datetime import datetime
 from demo_state import append_message, reset_demo
@@ -96,12 +97,7 @@ def force_chat_page():
 
 
 def clear_phone_query_params_for_sidebar():
-    for key in ["pa", "rid", "filter", "_t"]:
-        try:
-            if key in st.query_params:
-                del st.query_params[key]
-        except Exception:
-            pass
+    set_query_params_preserving_auth(pa=None, rid=None, filter=None, _t=None)
 
 # =============================================================================
 # Record helpers

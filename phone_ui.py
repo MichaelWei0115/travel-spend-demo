@@ -14,6 +14,7 @@ import streamlit as st
 from datetime import datetime
 from urllib.parse import urlencode
 
+from query_params import AUTH_QUERY_KEY, set_query_params_preserving_auth
 from reimbursement_data import (
     STATUS_PENDING_RECEIPT, STATUS_PENDING_SUBMIT, STATUS_SUBMITTED, STATUS_ERROR,
     get_status_label, get_pill_class, format_amount, get_cta_action,
@@ -101,6 +102,9 @@ def phone_action_form(label, action, cls, rid=None, filter_value=None, name=None
         hiddens += f'<input type="hidden" name="rid" value="{esc(rid)}">'
     if filter_value:
         hiddens += f'<input type="hidden" name="filter" value="{esc(filter_value)}">'
+    # Preserve demo_authed across GET form submissions
+    if st.query_params.get(AUTH_QUERY_KEY) == "1":
+        hiddens += f'<input type="hidden" name="{AUTH_QUERY_KEY}" value="1">'
     da = f' data-action="{esc(name or action)}"' if (name or action) else ""
     return f'<form class="phone-action-form" method="get" action="" target="_self"{da}>{hiddens}<button type="submit" class="{cls}">{esc(label)}</button></form>'
 
@@ -279,18 +283,14 @@ def consume_phone_action():
         append_chat_msg("你可以上传发票、行程单、支付截图等附件，AI 会自动识别并校验。")
         st.session_state.current_phone_page = "chat"
 
-    # Update query params for page reload survival
-    if st.session_state.get("current_phone_page"):
-        st.query_params["page"] = st.session_state["current_phone_page"]
-    else:
-        st.query_params["page"] = "chat"
+    # Update query params for page reload survival (preserving demo_authed)
+    updates = {"page": st.session_state.get("current_phone_page") or "chat"}
     if st.session_state.get("selected_record_id"):
-        st.query_params["rid"] = st.session_state["selected_record_id"]
-
+        updates["rid"] = st.session_state["selected_record_id"]
     # Clear action trigger params to prevent re-processing
     for key in ["pa", "_t", "filter"]:
-        if key in st.query_params:
-            del st.query_params[key]
+        updates[key] = None
+    set_query_params_preserving_auth(**updates)
 
     # Force UI version increment so sidebar/render loop detects the change
     st.session_state.ui_version = st.session_state.get("ui_version", 0) + 1
