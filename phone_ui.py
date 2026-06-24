@@ -445,10 +445,9 @@ iframe{border:none!important}
   .st-key-desktop_ai_lab_panel,.st-key-desktop_eval_observe_panel{display:none!important;visibility:hidden!important;height:0!important;min-height:0!important;overflow:hidden!important;margin:0!important;padding:0!important}
   .stTabs [data-baseweb="tab-panel"]:has(.st-key-desktop_ai_lab_panel),.stTabs [data-baseweb="tab-panel"]:has(.st-key-desktop_eval_observe_panel){display:none!important;visibility:hidden!important;height:0!important;min-height:0!important;overflow:hidden!important}
   .st-key-phone_shell{width:100vw!important;min-width:0!important;max-width:100vw!important;height:100svh!important;min-height:100svh!important;max-height:100svh!important;border-radius:0!important;box-shadow:none!important;border:none!important;overflow:hidden!important;display:flex!important;flex-direction:column!important}
-  .phone-app-v2{width:100vw!important;max-width:100vw!important;height:100%!important;min-height:0!important;display:flex!important;flex-direction:column!important;overflow:hidden!important}
-  .phone-body{width:100vw!important;max-width:100vw!important;flex:1!important;min-height:0!important;overflow-y:auto!important}
-  .phone-body.has-bottom-cta{width:100vw!important;max-width:100vw!important;flex:1!important;min-height:0!important;overflow-y:auto!important}
-  .phone-bottom,.phone-action-bottom,.phone-bottom-cta{width:100vw!important;max-width:100vw!important;flex-shrink:0!important;position:sticky!important;bottom:0!important;padding-bottom:calc(8px + env(safe-area-inset-bottom, 0px))!important}
+  .phone-app-v2{width:100vw!important;max-width:100vw!important;min-height:100svh!important;height:100svh!important;max-height:100svh!important;display:flex!important;flex-direction:column!important;overflow:hidden!important}
+  .phone-body,.phone-body.has-bottom,.phone-body.has-action-bottom,.phone-body.scroll-body,.phone-body.has-bottom-cta{width:100vw!important;max-width:100vw!important;height:auto!important;flex:1!important;min-height:0!important;overflow-y:auto!important}
+  .phone-bottom,.phone-action-bottom,.phone-bottom-cta{width:100vw!important;max-width:100vw!important;height:auto!important;flex-shrink:0!important;position:sticky!important;bottom:0!important;padding-bottom:calc(8px + env(safe-area-inset-bottom, 0px))!important}
   .st-key-side_panel{display:none!important}
   .stTabs [data-baseweb="tab-list"]{display:none!important}
   .stTabs [data-baseweb="tab-panel"]{display:block!important;visibility:visible!important;height:auto!important;min-height:0!important;overflow:visible!important}
@@ -787,6 +786,9 @@ def render_records_html():
         for v, l in chips_data
     ) + '</div>'
 
+    # Auth field for GET form submissions
+    _auth_hidden = f'<input type="hidden" name="{AUTH_QUERY_KEY}" value="1">' if st.query_params.get(AUTH_QUERY_KEY) == "1" else ""
+
     # Inbox cards: 整卡可点击进入详情
     cards_html = ""
     for r in filtered:
@@ -798,7 +800,7 @@ def render_records_html():
 <input type="hidden" name="pa" value="open_detail">
 <input type="hidden" name="_t" value="{int(time_mod.time()*1000)}">
 <input type="hidden" name="rid" value="{esc(r["id"])}">
-<button type="submit" class="record-inbox-card">
+{_auth_hidden}<button type="submit" class="record-inbox-card">
 <div class="record-left">
 <div class="record-merchant">{esc(r.get("merchant_name", ""))}</div>
 <div class="record-time">{esc(r.get("transaction_time", ""))}</div>

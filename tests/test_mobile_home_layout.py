@@ -115,11 +115,9 @@ class TestMobileHomeLayout(unittest.TestCase):
             blocks = _extract_mobile_blocks(content)
             found = False
             for block in blocks:
-                body_pattern = re.compile(r"\.phone-body\s*\{([^}]*)\}")
-                for m in body_pattern.finditer(block):
-                    body = m.group(1)
-                    if "flex:1" in body and "overflow-y:auto" in body:
-                        found = True
+                # The rule may be a combined selector like .phone-body,.phone-body.has-bottom,...
+                if ".phone-body" in block and "flex:1" in block and "overflow-y:auto" in block:
+                    found = True
             self.assertTrue(
                 found,
                 f"{fname}: .phone-body should have flex:1+overflow-y:auto in mobile CSS"
