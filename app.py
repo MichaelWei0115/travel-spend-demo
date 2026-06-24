@@ -35,7 +35,8 @@ inject_feedback_styles()
 # --- Auth Gate (password protection for Cloud deploy) ---
 check_auth()
 
-# Responsive CSS now handled by phone_shell.py
+# Responsive CSS and primary phone UI rendering are handled by phone_ui.py.
+# phone_shell.py is retained as legacy / fallback code only.
 
 # --- State Init ---
 init_full_state()
