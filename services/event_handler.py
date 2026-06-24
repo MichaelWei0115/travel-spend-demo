@@ -1,6 +1,7 @@
 """Event Handler Service - Routes events to appropriate processing pipelines."""
 
 import json
+import re
 from typing import Optional
 from .ai_client import call_ai, call_ai_with_forced_error
 from .matcher import match_receipt_to_transaction
@@ -112,12 +113,23 @@ def _handle_payment_success(payload, policies, version, context_mode, prefix_mod
     })
     working_memory.add_note(f"Tool call: create_ticket_reminder -> {tool_result.get('error', 'success')}")
 
-    # Build prompt
+    # Build prompt with all variables needed by v1 and v2 templates
+    policy_limit = policy.get("single_transaction_limit", "unknown")
+    policy_scope = "single transaction"
+    decline_reason = txn.get("decline_reason", "unknown")
+    matching_policy = policies.get("matching", {})
+
     prompt = _load_prompt("failure_explanation", version, {
         "merchant": txn["merchant"],
         "amount": txn["amount"],
         "currency": txn["currency"],
         "category": txn["category"],
+        "decline_reason": decline_reason,
+        "policy_limit": policy_limit,
+        "policy_scope": policy_scope,
+        "policy_json": json.dumps(policy),
+        "transaction_json": json.dumps(txn),
+        "history_json": "{}"
     })
 
     context = {"transaction": txn, "policy": policy, "tool_result": tool_result}
@@ -148,6 +160,9 @@ def _handle_payment_failed(payload, policies, version, context_mode, prefix_mode
         "decline_reason": txn.get("decline_reason", "unknown"),
         "policy_limit": policy.get("single_transaction_limit", "unknown"),
         "policy_scope": "single transaction",
+        "policy_json": json.dumps(policy),
+        "transaction_json": json.dumps(txn),
+        "history_json": "{}"
     })
 
     context = {"transaction": txn, "policy": policy}
@@ -206,12 +221,33 @@ def _handle_receipt_uploaded(payload, policies, version, context_mode, prefix_mo
         }
 
     context = {"receipt": receipt, "parsed": parsed}
+
+    # Matching policy tolerance values (used by v1 and v2 receipt_match templates)
+    matching_policy = policies.get("matching", {})
+    amount_tolerance_pct = matching_policy.get("amount_tolerance_pct", 15)
+    date_tolerance_days = matching_policy.get("date_tolerance_days", 2)
+    low_confidence_threshold = matching_policy.get("low_confidence_threshold", 0.60)
+
+    # receipt.uploaded event has no transaction_id; transaction-side
+    # variables are not yet available and will show as (pending match)
+    # in the prompt until receipt.matched event provides a transaction.
     prompt = _load_prompt("receipt_match", version, {
         "receipt_merchant": receipt["merchant"],
         "receipt_amount": receipt["amount"],
         "receipt_currency": receipt["currency"],
         "receipt_date": receipt.get("date", ""),
         "receipt_category": receipt.get("category", ""),
+        "txn_merchant": "(pending match)",
+        "txn_amount": "(pending match)",
+        "txn_currency": "(pending match)",
+        "txn_date": "(pending match)",
+        "txn_category": "(pending match)",
+        "amount_tolerance_pct": amount_tolerance_pct,
+        "date_tolerance_days": date_tolerance_days,
+        "low_confidence_threshold": low_confidence_threshold,
+        "receipt_json": json.dumps(receipt),
+        "transaction_json": "(pending match)",
+        "policy_json": json.dumps(policies),
     })
 
     return call_ai(prompt, "receipt.uploaded", context, version, context_mode, prefix_mode)
@@ -284,7 +320,13 @@ def _handle_override_attempt(payload):
 
 
 def _load_prompt(prompt_type: str, version: str, variables: dict) -> str:
-    """Load and format a prompt template."""
+    """Load and format a prompt template.
+
+    After variable substitution, scans for any remaining {placeholder}
+    tokens and logs a warning via working_memory so that unsubstituted
+    variables are visible in observability and can be caught before
+    connecting to a real AI API.
+    """
     filename = f"prompts/{prompt_type}_{version}.txt"
     try:
         with open(filename) as f:
@@ -292,6 +334,15 @@ def _load_prompt(prompt_type: str, version: str, variables: dict) -> str:
         # Simple variable substitution
         for key, value in variables.items():
             template = template.replace(f"{{{key}}}", str(value))
+
+        # Placeholder residual check: detect any remaining {var_name} tokens
+        residual_placeholders = re.findall(r"\{([a-zA-Z_][a-zA-Z0-9_]*)\}", template)
+        if residual_placeholders:
+            working_memory.add_note(
+                f"Prompt placeholder warning [{prompt_type}_{version}]: "
+                f"unsubstituted placeholders: {residual_placeholders}"
+            )
+
         return template
     except FileNotFoundError:
         return f"[Prompt template not found: {filename}]"
