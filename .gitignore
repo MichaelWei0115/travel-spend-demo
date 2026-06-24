@@ -7,6 +7,7 @@ __pycache__/
 .streamlit/secrets.toml
 
 *.bak
+*.bak*
 *.bak2
 *.pre_fix
 *.pre_convergence
