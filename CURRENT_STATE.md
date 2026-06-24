@@ -97,7 +97,7 @@ error
 
 ---
 
-## demo-cloud-v2-cleanup1 candidate
+## demo-cloud-v2-cleanup1 released
 
 Base:
 
@@ -125,4 +125,6 @@ Notes:
 - No changes to authentication logic.
 - No changes to core page interaction flow.
 - No changes to mobile CSS layout rules.
-- Cloud and mobile manual smoke testing is still required before tagging.
+- Cloud and mobile manual smoke testing passed on 2026-06-24.
+  - Desktop: 8/8 checks passed (PC 首页、无痕模式、口令认证、报销列表、费用详情、上传票据、立即提交、差旅政策页均正常).
+  - Mobile: 10/10 checks passed (无白屏/灰屏、AI Lab 未外露、底部布局正常、列表可滚动、CTA 可见、状态流转正常、demo_authed=1 保留).
