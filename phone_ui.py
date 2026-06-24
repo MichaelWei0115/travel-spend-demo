@@ -448,7 +448,7 @@ iframe{border:none!important}
   .phone-body.has-bottom-cta{width:100vw!important;max-width:100vw!important;height:auto!important;max-height:none!important;min-height:calc(100svh - 72px)!important;overflow-y:auto!important}
   .st-key-side_panel{display:none!important}
   .stTabs [data-baseweb="tab-list"]{display:none!important}
-  .stTabs [data-baseweb="tab-panel"]:nth-child(2),.stTabs [data-baseweb="tab-panel"]:nth-child(3){display:none!important}
+  .stTabs [data-baseweb="tab-panel"]{display:block!important;visibility:visible!important;height:auto!important;min-height:0!important;overflow:visible!important}
 }
 .expense-card{width:var(--content-w);margin:0 auto 10px;padding:14px 16px;background:#fff;border:1px solid #e5e8ef;border-radius:14px;box-shadow:0 4px 12px rgba(15,23,42,.04);box-sizing:border-box}
 .expense-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}

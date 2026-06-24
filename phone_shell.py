@@ -110,7 +110,7 @@ iframe{border:none!important}
   .st-key-phone_app{width:100vw!important;min-width:0!important;max-width:100vw!important;min-height:100svh!important;height:auto!important;max-height:none!important;overflow:visible!important}
   .st-key-chat_body_area{width:100vw!important;max-width:100vw!important;height:auto!important;min-height:calc(100svh - 148px)!important;max-height:none!important;overflow-y:auto!important}
   .st-key-chat_bottom_bar{width:100vw!important;max-width:100vw!important;overflow:visible!important}
-  .stTabs [data-baseweb="tab-panel"]:nth-child(2),.stTabs [data-baseweb="tab-panel"]:nth-child(3){display:none!important}
+  .stTabs [data-baseweb="tab-panel"]{display:block!important;visibility:visible!important;height:auto!important;min-height:0!important;overflow:visible!important}
 }
 </style>""", unsafe_allow_html=True)
 
