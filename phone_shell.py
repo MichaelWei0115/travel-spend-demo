@@ -106,10 +106,12 @@ iframe{border:none!important}
   .block-container{padding:0!important;width:100vw!important;max-width:100vw!important}
   .stApp{background:#f5f6f8!important}
   .st-key-side_panel{display:none!important}
-  .st-key-phone_shell{width:100vw!important;min-width:0!important;max-width:100vw!important;min-height:100svh!important;height:auto!important;max-height:none!important;border-radius:0!important;border:none!important;box-shadow:none!important;overflow:visible!important}
-  .st-key-phone_app{width:100vw!important;min-width:0!important;max-width:100vw!important;min-height:100svh!important;height:auto!important;max-height:none!important;overflow:visible!important}
-  .st-key-chat_body_area{width:100vw!important;max-width:100vw!important;height:auto!important;min-height:calc(100svh - 148px)!important;max-height:none!important;overflow-y:auto!important}
-  .st-key-chat_bottom_bar{width:100vw!important;max-width:100vw!important;overflow:visible!important}
+  .st-key-desktop_ai_lab_panel,.st-key-desktop_eval_observe_panel{display:none!important;visibility:hidden!important;height:0!important;min-height:0!important;overflow:hidden!important;margin:0!important;padding:0!important}
+  .stTabs [data-baseweb="tab-panel"]:has(.st-key-desktop_ai_lab_panel),.stTabs [data-baseweb="tab-panel"]:has(.st-key-desktop_eval_observe_panel){display:none!important;visibility:hidden!important;height:0!important;min-height:0!important;overflow:hidden!important}
+  .st-key-phone_shell{width:100vw!important;min-width:0!important;max-width:100vw!important;height:100svh!important;min-height:100svh!important;max-height:100svh!important;border-radius:0!important;border:none!important;box-shadow:none!important;overflow:hidden!important;display:flex!important;flex-direction:column!important}
+  .st-key-phone_app{width:100vw!important;min-width:0!important;max-width:100vw!important;flex:1!important;min-height:0!important;display:flex!important;flex-direction:column!important;overflow:hidden!important}
+  .st-key-chat_body_area{width:100vw!important;max-width:100vw!important;flex:1!important;min-height:0!important;overflow-y:auto!important;overflow-x:hidden!important}
+  .st-key-chat_bottom_bar{width:100vw!important;max-width:100vw!important;flex-shrink:0!important;position:sticky!important;bottom:0!important;padding-bottom:calc(12px + env(safe-area-inset-bottom, 0px))!important}
   .stTabs [data-baseweb="tab-panel"]{display:block!important;visibility:visible!important;height:auto!important;min-height:0!important;overflow:visible!important}
 }
 </style>""", unsafe_allow_html=True)

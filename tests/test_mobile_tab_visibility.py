@@ -1,21 +1,21 @@
 """
 Mobile Tab Panel Visibility Regression Tests
 =============================================
-Ensure mobile @media rules never hide tab-panels via nth-child+display:none,
-which caused the "flash then grey screen" bug on real phones.
-
-Checks:
-1. No tab-panel:nth-child(...){display:none} in mobile CSS
-2. Mobile tab-panels are explicitly visible (display:block; visibility:visible)
-3. Mobile tab-list can still be hidden
-4. Mobile side panel can still be hidden
-5. Viewport fixes from previous round are intact
+Ensure mobile @media rules:
+1. Never hide tab-panels via nth-child+display:none (caused grey screen)
+2. Hide AI Lab / eval panels by explicit container key
+3. Tab-panels remain generally visible
+4. Tab-list and side_panel can be hidden
+5. No 100vh on content containers (shell may use 100svh)
+6. No overflow:hidden on inner scrollable content areas without flex
 """
 
 import re
 import unittest
 
 TARGET_FILES = ["phone_shell.py", "phone_ui.py"]
+
+CONTENT_CONTAINERS = [".st-key-phone_app", ".phone-app-v2", ".phone-body", ".phone-body.has-bottom-cta"]
 
 
 def _extract_mobile_blocks(content: str) -> list[str]:
@@ -78,8 +78,36 @@ class TestMobileTabVisibility(unittest.TestCase):
                 f"{fname}: mobile CSS must include tab-panel display:block+visibility:visible"
             )
 
+    def test_ai_lab_panel_hidden_on_mobile(self):
+        """Mobile CSS should hide AI Lab panel by explicit container key."""
+        for fname in TARGET_FILES:
+            content = self._read_file(fname)
+            blocks = _extract_mobile_blocks(content)
+            found = False
+            for block in blocks:
+                if "desktop_ai_lab_panel" in block and "display:none" in block:
+                    found = True
+            self.assertTrue(
+                found,
+                f"{fname}: mobile CSS should hide .st-key-desktop_ai_lab_panel"
+            )
+
+    def test_eval_observe_panel_hidden_on_mobile(self):
+        """Mobile CSS should hide eval/observe panel by explicit container key."""
+        for fname in TARGET_FILES:
+            content = self._read_file(fname)
+            blocks = _extract_mobile_blocks(content)
+            found = False
+            for block in blocks:
+                if "desktop_eval_observe_panel" in block and "display:none" in block:
+                    found = True
+            self.assertTrue(
+                found,
+                f"{fname}: mobile CSS should hide .st-key-desktop_eval_observe_panel"
+            )
+
     def test_mobile_tab_list_can_be_hidden(self):
-        """Mobile CSS may (and should) hide the tab-list header."""
+        """Mobile CSS should hide the tab-list header."""
         for fname in TARGET_FILES:
             content = self._read_file(fname)
             blocks = _extract_mobile_blocks(content)
@@ -93,7 +121,7 @@ class TestMobileTabVisibility(unittest.TestCase):
             )
 
     def test_mobile_side_panel_can_be_hidden(self):
-        """Mobile CSS may hide .st-key-side_panel."""
+        """Mobile CSS should hide .st-key-side_panel."""
         for fname in TARGET_FILES:
             content = self._read_file(fname)
             blocks = _extract_mobile_blocks(content)
@@ -106,29 +134,38 @@ class TestMobileTabVisibility(unittest.TestCase):
                 f"{fname}: mobile CSS should hide side_panel"
             )
 
-    def test_viewport_fix_not_regressed(self):
-        """Mobile main containers must not use 100vh + overflow:hidden combo."""
-        dangerous_height = re.compile(r"height\s*:\s*100vh")
-        dangerous_overflow = re.compile(r"overflow\s*:\s*hidden")
-        main_containers = [".st-key-phone_shell", ".st-key-phone_app", ".phone-app-v2", ".phone-body"]
-
+    def test_no_100vh_on_content_containers(self):
+        """Inner content containers must not use height:100vh (use 100svh)."""
+        dangerous = re.compile(r"height\s*:\s*100vh")
         for fname in TARGET_FILES:
             content = self._read_file(fname)
             blocks = _extract_mobile_blocks(content)
             for block in blocks:
-                for container in main_containers:
+                for container in CONTENT_CONTAINERS:
                     escaped = re.escape(container).replace(r"\-", "-")
                     container_pattern = re.compile(escaped + r"\s*\{([^}]*)\}")
                     for m in container_pattern.finditer(block):
                         body = m.group(1)
                         self.assertIsNone(
-                            dangerous_height.search(body),
-                            f"{fname}: {container} still uses height:100vh in mobile CSS"
+                            dangerous.search(body),
+                            f"{fname}: {container} uses height:100vh (use 100svh)"
                         )
-                        self.assertIsNone(
-                            dangerous_overflow.search(body),
-                            f"{fname}: {container} still uses overflow:hidden in mobile CSS"
-                        )
+
+    def test_no_overflow_hidden_on_non_flex_content_containers(self):
+        """Inner content containers must not use overflow:hidden without flex layout."""
+        for fname in TARGET_FILES:
+            content = self._read_file(fname)
+            blocks = _extract_mobile_blocks(content)
+            for block in blocks:
+                for container in CONTENT_CONTAINERS:
+                    escaped = re.escape(container).replace(r"\-", "-")
+                    container_pattern = re.compile(escaped + r"\s*\{([^}]*)\}")
+                    for m in container_pattern.finditer(block):
+                        body = m.group(1)
+                        if "overflow:hidden" in body and "display:flex" not in body:
+                            self.fail(
+                                f"{fname}: {container} uses overflow:hidden without display:flex"
+                            )
 
 
 if __name__ == "__main__":

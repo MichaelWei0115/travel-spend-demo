@@ -1,39 +1,31 @@
 """
-Ticket 25+: Mobile Viewport CSS Regression Tests
-=================================================
-Ensure mobile @media rules never reintroduce the 100vh+overflow:hidden
-combo that caused white-screen on real phone browsers.
-
-Checks:
-1. No height:100vh or max-height:100vh on main containers inside @media(max-width:768px)
-2. Mobile main containers use min-height:100svh (or 100dvh)
-3. Mobile main containers have max-height:none
-4. Mobile main containers use overflow:visible (shell/app) or overflow-y:auto (body)
+Mobile Viewport CSS Regression Tests
+=====================================
+Ensure mobile @media rules use correct chat-app layout patterns:
+- Outer shell (phone_shell) uses svh-based viewport sizing + flex layout
+- Inner content areas use flex:1 + overflow-y:auto for scrollability
+- Bottom bars use flex-shrink:0 + sticky positioning
+- No 100vh (use 100svh instead for mobile address bar safety)
+- No overflow:hidden on inner scrollable content areas
 """
 
 import re
 import unittest
 
-# Files that contain mobile CSS we care about
 TARGET_FILES = ["phone_shell.py", "phone_ui.py"]
 
-# Containers that must not have fixed-height/overflow cropping on mobile
-MAIN_CONTAINERS = [
-    "st-key-phone_shell",
-    "st-key-phone_app",
-    "phone-app-v2",
-    "phone-body",
-]
+# Outer shell containers: allowed to have overflow:hidden + max-height:svh
+SHELL_CONTAINERS = [".st-key-phone_shell"]
 
-# Patterns that are dangerous on mobile main containers
-DANGEROUS_HEIGHT = re.compile(r"height\s*:\s*100vh")
-DANGEROUS_MAX_HEIGHT = re.compile(r"max-height\s*:\s*100vh")
-DANGEROUS_OVERFLOW = re.compile(r"overflow\s*:\s*hidden")
+# Inner content containers: must NOT have overflow:hidden
+CONTENT_CONTAINERS = [".st-key-phone_app", ".phone-app-v2", ".phone-body", ".phone-body.has-bottom-cta"]
+
+# Containers that must be scrollable
+SCROLLABLE_CONTAINERS = [".st-key-chat_body_area", ".phone-body", ".phone-body.has-bottom-cta"]
 
 
 def _extract_mobile_blocks(content: str) -> list[str]:
     """Extract text inside @media(max-width:768px) { ... } blocks."""
-    # Handle nested braces by counting depth
     blocks = []
     pattern = re.compile(r"@media\s*\(\s*max-width\s*:\s*768px\s*\)\s*\{")
     for m in pattern.finditer(content):
@@ -58,99 +50,96 @@ class TestMobileViewportCSS(unittest.TestCase):
         with open(filepath) as f:
             return f.read()
 
-    def test_mobile_css_no_100vh_on_main_containers(self):
-        """Main containers inside @media(max-width:768px) must not use height:100vh."""
+    def test_no_100vh_on_main_containers(self):
+        """No main container should use height:100vh in mobile CSS (use 100svh instead)."""
+        dangerous = re.compile(r"height\s*:\s*100vh")
         for fname in TARGET_FILES:
             content = self._read_file(fname)
             blocks = _extract_mobile_blocks(content)
             for block in blocks:
-                for container in MAIN_CONTAINERS:
-                    # Find rules for this container within the block
-                    # Match patterns like .container{...} or .container {...}
-                    container_pattern = re.compile(
-                        re.escape(container).replace(r"\-", r"-")
-                        + r"\s*\{([^}]*)\}"
-                    )
+                for container in SHELL_CONTAINERS + CONTENT_CONTAINERS:
+                    escaped = re.escape(container).replace(r"\-", "-")
+                    container_pattern = re.compile(escaped + r"\s*\{([^}]*)\}")
                     for rule_match in container_pattern.finditer(block):
                         rule_body = rule_match.group(1)
                         self.assertIsNone(
-                            DANGEROUS_HEIGHT.search(rule_body),
-                            f"{fname}: {container} uses height:100vh in mobile CSS"
-                        )
-                        self.assertIsNone(
-                            DANGEROUS_MAX_HEIGHT.search(rule_body),
-                            f"{fname}: {container} uses max-height:100vh in mobile CSS"
+                            dangerous.search(rule_body),
+                            f"{fname}: {container} uses height:100vh in mobile CSS (use 100svh)"
                         )
 
-    def test_mobile_css_no_overflow_hidden_on_main_containers(self):
-        """Main containers inside @media(max-width:768px) must not use overflow:hidden."""
+    def test_shell_uses_svh_viewport(self):
+        """Outer shell should use 100svh-based viewport sizing with flex layout."""
+        for fname in TARGET_FILES:
+            content = self._read_file(fname)
+            blocks = _extract_mobile_blocks(content)
+            found_svh = False
+            for block in blocks:
+                shell_pattern = re.compile(r"\.st-key-phone_shell\s*\{([^}]*)\}")
+                for m in shell_pattern.finditer(block):
+                    body = m.group(1)
+                    if "100svh" in body and "display:flex" in body:
+                        found_svh = True
+            self.assertTrue(
+                found_svh,
+                f"{fname}: .st-key-phone_shell should use 100svh + display:flex in mobile CSS"
+            )
+
+    def test_inner_content_containers_no_overflow_hidden(self):
+        """Inner content containers must NOT use overflow:hidden without flex layout.
+
+        overflow:hidden is acceptable on flex column containers (display:flex + overflow:hidden)
+        because they act as bounded flex parents where children handle their own scrolling.
+        overflow:hidden is dangerous only when used without any flex structure.
+        """
         for fname in TARGET_FILES:
             content = self._read_file(fname)
             blocks = _extract_mobile_blocks(content)
             for block in blocks:
-                for container in MAIN_CONTAINERS:
-                    container_pattern = re.compile(
-                        re.escape(container).replace(r"\-", r"-")
-                        + r"\s*\{([^}]*)\}"
-                    )
+                for container in CONTENT_CONTAINERS:
+                    escaped = re.escape(container).replace(r"\-", "-")
+                    container_pattern = re.compile(escaped + r"\s*\{([^}]*)\}")
                     for rule_match in container_pattern.finditer(block):
                         rule_body = rule_match.group(1)
-                        self.assertIsNone(
-                            DANGEROUS_OVERFLOW.search(rule_body),
-                            f"{fname}: {container} uses overflow:hidden in mobile CSS"
-                        )
+                        has_overflow_hidden = "overflow:hidden" in rule_body
+                        has_flex = "display:flex" in rule_body or "flex:1" in rule_body
+                        if has_overflow_hidden and not has_flex:
+                            self.fail(
+                                f"{fname}: {container} uses overflow:hidden without flex layout in mobile CSS"
+                            )
 
-    def test_mobile_css_uses_dynamic_viewport(self):
-        """Mobile shell/app containers should use svh/dvh, not vh."""
-        for fname in TARGET_FILES:
+    def test_scrollable_containers_have_overflow_auto(self):
+        """Content areas that should scroll must have overflow-y:auto."""
+        for fname in ["phone_shell.py"]:
             content = self._read_file(fname)
             blocks = _extract_mobile_blocks(content)
+            found = False
             for block in blocks:
-                # Check that .st-key-phone_shell uses svh or dvh
-                shell_pattern = re.compile(
-                    r"\.st-key-phone_shell\s*\{([^}]*)\}"
-                )
-                for rule_match in shell_pattern.finditer(block):
-                    rule_body = rule_match.group(1)
-                    self.assertTrue(
-                        "svh" in rule_body or "dvh" in rule_body,
-                        f"{fname}: .st-key-phone_shell should use svh/dvh in mobile CSS"
-                    )
+                chat_pattern = re.compile(r"\.st-key-chat_body_area\s*\{([^}]*)\}")
+                for m in chat_pattern.finditer(block):
+                    body = m.group(1)
+                    if "overflow-y:auto" in body:
+                        found = True
+            self.assertTrue(
+                found,
+                f"{fname}: .st-key-chat_body_area should have overflow-y:auto in mobile CSS"
+            )
 
-    def test_mobile_css_max_height_none_on_main_containers(self):
-        """Mobile main containers should have max-height:none."""
-        for fname in TARGET_FILES:
+    def test_bottom_bar_sticky(self):
+        """Chat bottom bar should be sticky at bottom."""
+        for fname in ["phone_shell.py"]:
             content = self._read_file(fname)
             blocks = _extract_mobile_blocks(content)
+            found = False
             for block in blocks:
-                # Check phone_shell at minimum
-                shell_pattern = re.compile(
-                    r"\.st-key-phone_shell\s*\{([^}]*)\}"
-                )
-                for rule_match in shell_pattern.finditer(block):
-                    rule_body = rule_match.group(1)
-                    self.assertIn(
-                        "max-height:none",
-                        rule_body,
-                        f"{fname}: .st-key-phone_shell should have max-height:none in mobile CSS"
-                    )
-
-    def test_mobile_css_shell_overflow_visible(self):
-        """Mobile phone_shell and phone_app should use overflow:visible."""
-        for fname in TARGET_FILES:
-            content = self._read_file(fname)
-            blocks = _extract_mobile_blocks(content)
-            for block in blocks:
-                shell_pattern = re.compile(
-                    r"\.st-key-phone_shell\s*\{([^}]*)\}"
-                )
-                for rule_match in shell_pattern.finditer(block):
-                    rule_body = rule_match.group(1)
-                    self.assertIn(
-                        "overflow:visible",
-                        rule_body,
-                        f"{fname}: .st-key-phone_shell should have overflow:visible in mobile CSS"
-                    )
+                bar_pattern = re.compile(r"\.st-key-chat_bottom_bar\s*\{([^}]*)\}")
+                for m in bar_pattern.finditer(block):
+                    body = m.group(1)
+                    if "position:sticky" in body and "bottom:0" in body:
+                        found = True
+            self.assertTrue(
+                found,
+                f"{fname}: .st-key-chat_bottom_bar should have position:sticky + bottom:0 in mobile CSS"
+            )
 
 
 if __name__ == "__main__":
