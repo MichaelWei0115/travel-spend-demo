@@ -1,4 +1,11 @@
 """
+Legacy: Old 5-state model action map — NOT used by current business logic.
+This module is retained for historical reference only.
+Current Demo uses the 4-state model (pending_receipt, pending_submit, submitted, error).
+Do not import or extend this module.
+"""
+
+"""
 Demo Action Map
 ===============
 Unified interaction event spec for every clickable element in the Demo.

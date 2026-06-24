@@ -1,4 +1,11 @@
 """
+Legacy: Old UI components module — NOT used by current business logic.
+The current primary mobile UI is implemented in phone_ui.py.
+This module is retained for historical reference only.
+Do not import or extend this module.
+"""
+
+"""
 UI Components for Travel Spend AI Assistant
 ============================================
 DingTalk-style chat UI with mobile-first responsive layout.
