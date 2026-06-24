@@ -101,12 +101,15 @@ iframe{border:none!important}
 
 /* Mobile */
 @media(max-width:768px){
+  html,body,.stApp,[data-testid="stAppViewContainer"]{min-height:100svh!important;height:auto!important;overflow-y:auto!important;overflow-x:hidden!important}
   .stTabs [data-baseweb="tab-list"]{display:none!important}
-  .block-container{padding:0!important;max-width:100%!important}
+  .block-container{padding:0!important;width:100vw!important;max-width:100vw!important}
   .stApp{background:#f5f6f8!important}
   .st-key-side_panel{display:none!important}
-  .st-key-phone_shell{width:100vw!important;max-width:100vw!important;height:100vh!important;max-height:100vh!important;border-radius:0!important;border:none!important;box-shadow:none!important}
-  .st-key-phone_app{width:100vw!important;max-width:100vw!important;height:100vh!important;max-height:100vh!important}
+  .st-key-phone_shell{width:100vw!important;min-width:0!important;max-width:100vw!important;min-height:100svh!important;height:auto!important;max-height:none!important;border-radius:0!important;border:none!important;box-shadow:none!important;overflow:visible!important}
+  .st-key-phone_app{width:100vw!important;min-width:0!important;max-width:100vw!important;min-height:100svh!important;height:auto!important;max-height:none!important;overflow:visible!important}
+  .st-key-chat_body_area{width:100vw!important;max-width:100vw!important;height:auto!important;min-height:calc(100svh - 148px)!important;max-height:none!important;overflow-y:auto!important}
+  .st-key-chat_bottom_bar{width:100vw!important;max-width:100vw!important;overflow:visible!important}
   .stTabs [data-baseweb="tab-panel"]:nth-child(2),.stTabs [data-baseweb="tab-panel"]:nth-child(3){display:none!important}
 }
 </style>""", unsafe_allow_html=True)

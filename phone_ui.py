@@ -441,8 +441,11 @@ iframe{border:none!important}
 .ai-status-bar.status-error{background:var(--danger-bg);color:var(--danger);border:1px solid #fecaca}
 .ai-status-icon{width:20px;height:20px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:12px;flex:0 0 20px}
 @media(max-width:768px){
-  .st-key-phone_shell{width:100vw!important;max-width:100vw!important;height:100vh!important;max-height:100vh!important;border-radius:0!important;box-shadow:none!important;border:none!important}
-  .phone-app-v2{width:100vw;height:100vh}
+  html,body,.stApp,[data-testid="stAppViewContainer"]{min-height:100svh!important;height:auto!important;overflow-y:auto!important;overflow-x:hidden!important}
+  .st-key-phone_shell{width:100vw!important;min-width:0!important;max-width:100vw!important;min-height:100svh!important;height:auto!important;max-height:none!important;border-radius:0!important;box-shadow:none!important;border:none!important;overflow:visible!important}
+  .phone-app-v2{width:100vw!important;max-width:100vw!important;min-height:100svh!important;height:auto!important;max-height:none!important;overflow:visible!important}
+  .phone-body{width:100vw!important;max-width:100vw!important;height:auto!important;max-height:none!important;overflow-y:auto!important}
+  .phone-body.has-bottom-cta{width:100vw!important;max-width:100vw!important;height:auto!important;max-height:none!important;min-height:calc(100svh - 72px)!important;overflow-y:auto!important}
   .st-key-side_panel{display:none!important}
   .stTabs [data-baseweb="tab-list"]{display:none!important}
   .stTabs [data-baseweb="tab-panel"]:nth-child(2),.stTabs [data-baseweb="tab-panel"]:nth-child(3){display:none!important}
