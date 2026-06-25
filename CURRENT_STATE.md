@@ -128,7 +128,7 @@ Notes:
 - Cloud and mobile manual smoke testing passed on 2026-06-24.
   - Desktop: 8/8 checks passed (PC 首页、无痕模式、口令认证、报销列表、费用详情、上传票据、立即提交、差旅政策页均正常).
   - Mobile: 10/10 checks passed (无白屏/灰屏、AI Lab 未外露、底部布局正常、列表可滚动、CTA 可见、状态流转正常、demo_authed=1 保留).
-- Merged to main and pushed to GitHub on 2026-06-25; Streamlit Cloud deployment triggered.
+- Merged to main, pushed to GitHub, and Streamlit Cloud deployed on 2026-06-25.
   - Automated: 153 tests passed, tag demo-cloud-v2-cleanup1 pushed to remote.
-  - Cloud app returns HTTP 303 (正常重定向), deployment is live.
-  - Full browser smoke test per SMOKE_TEST_CHECKLIST.md should be re-run after Cloud rebuild completes.
+  - Cloud smoke test per SMOKE_TEST_CHECKLIST.md: Desktop 8/8 passed, Mobile 10/10 passed.
+  - demo-cloud-v2-cleanup1 confirmed as new stable baseline tag.
