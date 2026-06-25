@@ -67,7 +67,7 @@ streamlit run app.py
 
 | 问题 | 解决方案 |
 |------|---------|
-| Tab1 手机壳空白 | 检查 `phone_ui.py` 和 `phone_shell.py` 是否正确 import |
+| Tab1 手机壳空白 | 检查 `phone_ui.py` 是否正确 import；`phone_shell.py` 为 legacy 模块，不影响主流程 |
 | 评估用例加载失败 | 确认 `data/eval_cases.json` 在 git tracking 中 |
 | 口令页面不出现 | 确认 `DEMO_PASSWORD` 在 Streamlit Cloud Secrets 中设为非空字符串 |
 | Import Error | 本地运行 `pip install -r requirements.txt` 后重新部署 |

@@ -1,4 +1,18 @@
-> **Deprecated Notice**: 本文档描述的是旧 5 状态 / 双状态模型，可能与当前代码不一致。当前实现以 `CURRENT_STATE.md` 和 `reimbursement_data.py` 为准。
+> **Deprecated Notice**:
+> This document may contain historical references to the old 5-state / dual-status reimbursement model.
+> The current authoritative model is the 4-state model documented in CURRENT_STATE.md:
+>
+> - pending_receipt
+> - pending_submit
+> - submitted
+> - error
+>
+> Do not restore or extend the deprecated fields:
+>
+> - ai_check_result
+> - sync_status
+> - need_supplement
+> - sync_failed
 
 # Ticket 25 Verification Report
 

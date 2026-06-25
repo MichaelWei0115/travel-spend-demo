@@ -1,6 +1,15 @@
 """
+Legacy / fallback phone shell renderer.
+
+The current primary mobile UI and mobile CSS are implemented in phone_ui.py.
+This module is retained only for backward compatibility and regression protection.
+
+Do not add new UI logic here.
+Do not migrate new mobile rendering work into this module.
+
+---
+Original description:
 Phone App Shell - Stable Container Layout (390x867)
-====================================================
 All layout uses st.container(key=...) and st.columns.
 NO HTML divs wrapping across Streamlit controls.
 NO position:absolute on buttons. NO use_container_width on card buttons.

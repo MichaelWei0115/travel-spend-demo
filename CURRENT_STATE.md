@@ -93,3 +93,38 @@ error
 - 状态机重构
 
 当前目标是稳定演示与验收，不是继续扩展生产功能。
+
+
+---
+
+## demo-cloud-v2-cleanup1 released
+
+Base:
+
+- demo-cloud-v2
+- 7251f2b
+
+Summary:
+
+- Aligned deprecated documents with the current 4-state reimbursement model.
+- Marked phone_shell.py as legacy / fallback.
+- Moved unused legacy modules (action_map.py, ui_components.py) out of the active root path.
+- Fixed prompt variable injection gaps in services/event_handler.py (v1 and v2 templates).
+- Added prompt rendering regression tests to prevent unresolved placeholders.
+- Configured pytest to exclude legacy and visual/manual test folders.
+- Added .gitignore coverage for *.bak* backup file patterns.
+- Updated DEPLOYMENT.md troubleshooting to reflect phone_shell.py legacy status.
+
+Test result:
+
+- 153 passed / 0 failed
+
+Notes:
+
+- No changes to the 4-state reimbursement state machine.
+- No changes to authentication logic.
+- No changes to core page interaction flow.
+- No changes to mobile CSS layout rules.
+- Cloud and mobile manual smoke testing passed on 2026-06-24.
+  - Desktop: 8/8 checks passed (PC 首页、无痕模式、口令认证、报销列表、费用详情、上传票据、立即提交、差旅政策页均正常).
+  - Mobile: 10/10 checks passed (无白屏/灰屏、AI Lab 未外露、底部布局正常、列表可滚动、CTA 可见、状态流转正常、demo_authed=1 保留).
